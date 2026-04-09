@@ -1,0 +1,15 @@
+{
+  "name": "tagsearch-js",
+  "version": "1.0.0",
+  "description": "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

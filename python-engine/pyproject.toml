@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "tagsearch"
+version = "1.0.0"
+description = "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking)"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

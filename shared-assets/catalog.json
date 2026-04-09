@@ -1,0 +1,131 @@
+{
+  "version": "1.0",
+  "description": "Shared test dataset — source of truth for cross-language score validation",
+  "scoring_constants": {
+    "BM25_K1": 1.5,
+    "BM25_B": 0.75,
+    "BM25_CAP": 10.0,
+    "QUALITY_EXPONENT": 1.5,
+    "PRIOR_MEAN": 3.5,
+    "PRIOR_WEIGHT": 10.0,
+    "TYPE_MISMATCH_FACTOR": 0.1,
+    "NICHE_BOOST": 1.2,
+    "PROXIMITY_BONUS": 1.15,
+    "PRICE_BUDGET_BOOST": 1.1,
+    "BM25_FLOOR": 0.05
+  },
+  "products": [
+    {
+      "id": 1, "name": "Clavier Mécanique RGB Pro",
+      "type": "PHYSICAL", "niche": "gaming",
+      "price": 129.99, "location": "France",
+      "avg_rating": 4.8, "review_count": 342,
+      "tags": ["clavier", "gaming", "rgb", "mécanique", "tech"]
+    },
+    {
+      "id": 2, "name": "Souris Gaming Sans Fil",
+      "type": "PHYSICAL", "niche": "gaming",
+      "price": 79.99, "location": "France",
+      "avg_rating": 4.2, "review_count": 187,
+      "tags": ["souris", "gaming", "sans-fil", "tech"]
+    },
+    {
+      "id": 3, "name": "Casque Audio Bluetooth",
+      "type": "PHYSICAL", "niche": "audio",
+      "price": 89.99, "location": "Belgique",
+      "avg_rating": 3.9, "review_count": 95,
+      "tags": ["casque", "audio", "bluetooth", "sans-fil"]
+    },
+    {
+      "id": 4, "name": "Robot Pâtissier 1200W",
+      "type": "PHYSICAL", "niche": "cuisine",
+      "price": 349.00, "location": "France",
+      "avg_rating": 4.6, "review_count": 521,
+      "tags": ["robot", "cuisine", "pâtisserie", "électroménager"]
+    },
+    {
+      "id": 5, "name": "E-book : Maîtriser la Pâtisserie",
+      "type": "DIGITAL", "niche": "cuisine",
+      "price": 14.99, "location": null,
+      "avg_rating": 4.3, "review_count": 88,
+      "tags": ["ebook", "cuisine", "pâtisserie", "recettes", "digital"]
+    },
+    {
+      "id": 6, "name": "Formation SaaS : Growth Hacking",
+      "type": "DIGITAL", "niche": "saas",
+      "price": 199.00, "location": null,
+      "avg_rating": 4.7, "review_count": 63,
+      "tags": ["formation", "saas", "growth", "marketing", "digital"]
+    },
+    {
+      "id": 7, "name": "Sérum Visage Anti-Âge",
+      "type": "PHYSICAL", "niche": "beauté",
+      "price": 45.00, "location": "France",
+      "avg_rating": 2.8, "review_count": 12,
+      "tags": ["sérum", "beauté", "soin", "visage"]
+    },
+    {
+      "id": 8, "name": "Palette Maquillage Pro",
+      "type": "PHYSICAL", "niche": "beauté",
+      "price": 32.50, "location": "Belgique",
+      "avg_rating": 4.5, "review_count": 276,
+      "tags": ["maquillage", "beauté", "palette", "cosmétique"]
+    },
+    {
+      "id": 9, "name": "Tapis de Yoga Antidérapant",
+      "type": "PHYSICAL", "niche": "sport",
+      "price": 29.99, "location": "France",
+      "avg_rating": 4.1, "review_count": 430,
+      "tags": ["yoga", "sport", "tapis", "fitness"]
+    },
+    {
+      "id": 10, "name": "Abonnement App Méditation",
+      "type": "DIGITAL", "niche": "sport",
+      "price": 9.99, "location": null,
+      "avg_rating": 4.4, "review_count": 1200,
+      "tags": ["méditation", "sport", "bien-être", "digital", "abonnement"]
+    }
+  ],
+  "cross_language_test_cases": [
+    {
+      "id": "TC01",
+      "description": "cuisine sans filtre — Physical > Digital par Bayesian rating",
+      "query": "cuisine",
+      "preferences": {},
+      "expected_order": [4, 5],
+      "score_tolerance": 1e-9
+    },
+    {
+      "id": "TC02",
+      "description": "cuisine avec preferred_type=DIGITAL — E-book en tête",
+      "query": "cuisine",
+      "preferences": { "preferred_type": "DIGITAL" },
+      "expected_order": [5, 4]
+    },
+    {
+      "id": "TC03",
+      "description": "gaming budget max 100€ — Clavier exclu, Souris seule",
+      "query": "gaming",
+      "preferences": { "max_price": 100.0, "user_location": "France" },
+      "expected_ids": [2],
+      "excluded_ids": [1]
+    },
+    {
+      "id": "TC04",
+      "description": "beauté min_rating 4.0 — Sérum exclu",
+      "query": "beauté",
+      "preferences": { "min_rating": 4.0 },
+      "expected_ids": [8],
+      "excluded_ids": [7]
+    },
+    {
+      "id": "TC05",
+      "description": "fuzzy gaiming max_dist=1 — résultats gaming",
+      "query": "gaiming",
+      "preferences": {},
+      "fuzzy": true,
+      "max_dist": 1,
+      "expected_niche": "gaming"
+    }
+  ]
+}
