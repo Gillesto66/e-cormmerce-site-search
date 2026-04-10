@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+tagsearch/__init__.py
+tagsearch/engine.py
+tagsearch/models.py
+tagsearch/scoring.py
+tagsearch/structures.py
+tagsearch.egg-info/PKG-INFO
+tagsearch.egg-info/SOURCES.txt
+tagsearch.egg-info/dependency_links.txt
+tagsearch.egg-info/requires.txt
+tagsearch.egg-info/top_level.txt
+tests/test_cross_language.py

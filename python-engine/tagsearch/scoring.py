@@ -1,6 +1,7 @@
 """
 tagsearch.scoring
 =================
+Réalisée par Gillesto66 & Kiro
 BM25Index + calculate_final_score.
 
 Formules canoniques documentées ici — source de vérité pour le portage TS/PHP.

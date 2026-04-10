@@ -1,5 +1,6 @@
 /**
  * tagsearch/scoring.ts
+ * Réalisée par Gillesto66 & Kiro
  * BM25Index + calculateFinalScore — portage fidèle de scoring.py
  *
  * Précision flottante :

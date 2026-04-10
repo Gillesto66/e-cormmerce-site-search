@@ -1,5 +1,6 @@
 /**
  * tagsearch/engine.ts
+ * Réalisée par Gillesto66 & Kiro
  * SearchEngine — portage fidèle de engine.py
  * Optimisé pour environnements Serverless (Vercel) : pas d'I/O bloquant,
  * état entièrement in-memory, reconstruction DAWG en batch.

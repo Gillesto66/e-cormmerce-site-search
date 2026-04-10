@@ -1,5 +1,6 @@
 /**
  * tagsearch/models.ts
+ * Réalisée par Gillesto66 & Kiro
  * Structures de données métier — portage fidèle de models.py
  */
 

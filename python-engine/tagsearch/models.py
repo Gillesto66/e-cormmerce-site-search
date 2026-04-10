@@ -1,6 +1,7 @@
 """
 tagsearch.models
 ================
+Réalisée par Gillesto66 & Kiro
 Structures de données métier : ProductType, ProductMeta, SearchPreferences.
 Tous les dataclasses utilisent slots=True (Python 3.10+) pour minimiser la RAM.
 """

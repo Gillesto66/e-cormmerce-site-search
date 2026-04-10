@@ -1,6 +1,7 @@
 """
 tagsearch.structures
 ====================
+Réalisée par Gillesto66 & Kiro
 Structures de données bas niveau (Phase 1) :
   - TrieNode / Trie       : __slots__ + tableau fixe O(1)
   - DAWGNode / DAWG       : FST simplifié, partage de suffixes

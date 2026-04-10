@@ -1,4 +1,5 @@
 <?php
+// Réalisée par Gillesto66 & Kiro
 declare(strict_types=1);
 namespace TagSearch;
 

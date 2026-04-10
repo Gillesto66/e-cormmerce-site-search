@@ -1,5 +1,6 @@
 /**
  * tagsearch/structures.ts
+ * Réalisée par Gillesto66 & Kiro
  * DAWG + LRUCache — portage de structures.py
  * Note : pas de __slots__ en TS, mais les classes sont naturellement compactes.
  */

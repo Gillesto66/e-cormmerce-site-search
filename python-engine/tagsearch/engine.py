@@ -1,6 +1,7 @@
 """
 tagsearch.engine
 ================
+Réalisée par Gillesto66 & Kiro
 SearchEngine : point d'entrée public de la bibliothèque.
 Orchestre DAWG, BM25Index, CompressedPostingsList, LRUCache et calculate_final_score.
 """
