@@ -22,7 +22,10 @@ Exposer le même moteur de recherche TagSearch dans l'écosystème PHP, avec :
 ```
 src/
 ├── ProductType.php         Enum backed int (PHYSICAL=0, DIGITAL=1)
-├── ProductMeta.php         readonly class — métadonnées produit
+├── ProductMeta.php         métadonnées produit (readonly, niche normalisée)
+├── Unicode.php             minuscules / découpage / tri / arrondi 4 décimales (parité Python)
+├── DAWG.php, DAWGNode.php  graphe acyclique minimal
+├── VarInt.php, CompressedPostingsList.php   postings delta + VarInt
 ├── SearchPreferences.php   Préférences utilisateur pour le re-ranking
 ├── ScoringConstants.php    Constantes BM25 + scoring (chargées via composer files)
 ├── BM25Index.php           Okapi BM25 in-memory
@@ -30,7 +33,7 @@ src/
 └── SearchEngine.php        Point d'entrée public + LRU cache
 ```
 
-Note : PHP n'a pas d'implémentation native de DAWG. Le moteur utilise `levenshtein()` natif (C) pour la recherche floue et `str_starts_with()` pour l'autocomplétion.
+Note : `DAWG.php` est un vrai DAWG (algorithme de Daciuk), et `CompressedPostingsList.php` compresse les postings en delta + VarInt (−94 % mesuré sur 500 identifiants). Le moteur n'utilise **pas** `levenshtein()` ni `strtolower()` natifs : ils travaillent sur des octets, donc « pâtisserie » serait à distance 2 de « patisserie » (« â » = 2 octets) et « É » ne serait pas abaissé. Tout passe par `Unicode` (`mb_strtolower`, `mb_str_split`) : l'extension **mbstring est requise**.
 
 ---
 
@@ -48,7 +51,7 @@ composer install
 use TagSearch\{SearchEngine, SearchPreferences, ProductType};
 
 $engine = new SearchEngine(cacheSize: 200);
-$engine->loadCatalog(__DIR__ . '/../shared-assets/catalog.json');
+$engine->loadCatalog(__DIR__ . '/tests/fixtures/catalog.json');   // ou votre propre catalogue JSON
 
 // Recherche simple
 $result = $engine->search('gaming');
@@ -120,10 +123,12 @@ public function search(
 ## Tests
 
 ```bash
-php vendor/phpunit/phpunit/phpunit --testdox
+vendor/bin/phpunit --testdox
 ```
 
-36 tests PHPUnit en 5 sections : BM25Index, ProductMeta, Scorer, SearchEngine (TC01-TC05), Robustesse.
+55 tests PHPUnit : les 36 tests historiques (BM25Index, ProductMeta, Scorer, SearchEngine TC01-TC05, robustesse), `IndexingTest` (indexation en lot, remplacement/retrait, cache, DAWG, VarInt, Unicode) et `ReferenceTest` (rejeu des 261 requêtes de `tests/fixtures/reference.json`, généré par le moteur Python).
+
+Les fixtures sont **dans le paquet** (`tests/fixtures/`) : les tests passent hors du monorepo. Elles sont copiées depuis `shared-assets/` par `scripts/sync_fixtures.py`.
 
 ---
 

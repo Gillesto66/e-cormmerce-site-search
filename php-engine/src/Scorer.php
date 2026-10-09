@@ -32,13 +32,13 @@ final class Scorer
         $typeFactor  = ($prefs->preferredType !== null && $meta->productType !== $prefs->preferredType)
                      ? TYPE_MISMATCH : 1.0;
         $nicheFactor = ($prefs->preferredNiche !== null
-                     && $meta->niche === strtolower($prefs->preferredNiche))
+                     && $meta->niche === Unicode::lower($prefs->preferredNiche))
                      ? NICHE_BOOST : 1.0;
 
         // ── Dim 4 : Proximité ─────────────────────────────────────────────────
         $proximity = 1.0;
         if ($meta->location !== null && $prefs->userLocation !== null
-            && strtolower($meta->location) === strtolower($prefs->userLocation)) {
+            && Unicode::lower($meta->location) === Unicode::lower($prefs->userLocation)) {
             $proximity = PROXIMITY_BONUS;
         }
 
@@ -50,6 +50,6 @@ final class Scorer
         }
 
         $final = $bm25Norm * $qualityMult * $typeFactor * $nicheFactor * $proximity * $priceFactor;
-        return round($final, 4);
+        return Unicode::round4($final);
     }
 }

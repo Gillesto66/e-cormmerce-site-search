@@ -12,7 +12,6 @@ Toute modification doit être répercutée dans shared-assets/catalog.json
 from __future__ import annotations
 import logging
 import math
-from collections import defaultdict
 
 from .models import ProductMeta, ProductType, SearchPreferences
 
@@ -47,11 +46,12 @@ class BM25Index:
     """
 
     def __init__(self) -> None:
-        self.tf:    dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
-        self.df:    dict[str, int]            = defaultdict(int)
+        self.tf:    dict[str, dict[int, int]] = {}
+        self.df:    dict[str, int]            = {}
         self.dl:    dict[int, int]            = {}
         self.N:     int                       = 0
         self.avgdl: float                     = 0.0
+        self._dl_sum: int                     = 0   # somme courante : avgdl en O(1) (et non O(N) par ajout)
 
     def index(self, product_id: int, tags: list[str]) -> None:
         """
@@ -60,16 +60,38 @@ class BM25Index:
         Args:
             product_id: Identifiant unique du produit.
             tags:       Liste de tags (non normalisés, la normalisation est interne).
+
+        Raises:
+            ValueError: Si le produit est déjà indexé (appeler remove() d'abord).
         """
+        if product_id in self.dl:
+            raise ValueError(f"BM25: produit {product_id} déjà indexé — appeler remove() d'abord.")
         tags_lower = [t.lower() for t in tags]
         self.dl[product_id] = len(tags_lower)
+        self._dl_sum += len(tags_lower)
         self.N += 1
-        self.avgdl = sum(self.dl.values()) / self.N
+        self.avgdl = self._dl_sum / self.N
         for tag in tags_lower:
-            self.tf[tag][product_id] += 1
-            if self.tf[tag][product_id] == 1:
-                self.df[tag] += 1
+            postings = self.tf.setdefault(tag, {})
+            if product_id not in postings:
+                self.df[tag] = self.df.get(tag, 0) + 1
+            postings[product_id] = postings.get(product_id, 0) + 1
         logger.debug("BM25: produit %d indexé (%d tags, avgdl=%.2f)", product_id, len(tags_lower), self.avgdl)
+
+    def remove(self, product_id: int, tags: list[str]) -> None:
+        """Désindexe un produit. `tags` : les tags qui avaient été passés à index()."""
+        if product_id not in self.dl:
+            return
+        self._dl_sum -= self.dl.pop(product_id)
+        self.N -= 1
+        self.avgdl = self._dl_sum / self.N if self.N else 0.0
+        for tag in {t.lower() for t in tags}:
+            postings = self.tf.get(tag)
+            if postings is not None and postings.pop(product_id, None) is not None:
+                self.df[tag] -= 1
+                if not postings:
+                    del self.tf[tag]
+                    del self.df[tag]
 
     def score(self, product_id: int, query_tags: list[str]) -> float:
         """
@@ -88,7 +110,7 @@ class BM25Index:
         dl_d = self.dl.get(product_id, 0)
         for tag in query_tags:
             tag = tag.lower()
-            tf_val = self.tf[tag].get(product_id, 0)
+            tf_val = self.tf.get(tag, {}).get(product_id, 0)
             if tf_val == 0: continue
             df_val = self.df.get(tag, 0)
             idf  = math.log((self.N - df_val + 0.5) / (df_val + 0.5) + 1)

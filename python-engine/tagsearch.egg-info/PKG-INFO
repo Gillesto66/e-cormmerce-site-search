@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: tagsearch
-Version: 1.0.0
-Summary: In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking)
-Requires-Python: >=3.11
-Provides-Extra: dev
-Requires-Dist: pytest>=8.0; extra == "dev"
-Requires-Dist: pytest-cov; extra == "dev"

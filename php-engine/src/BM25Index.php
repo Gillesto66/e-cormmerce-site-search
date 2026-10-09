@@ -17,19 +17,60 @@ final class BM25Index
     private array $dl = [];
     private int   $N     = 0;
     private float $avgdl = 0.0;
+    private int   $dlSum = 0;   // somme courante : avgdl en O(1) (et non array_sum O(N) par ajout)
+
+    public function docCount(): int
+    {
+        return $this->N;
+    }
+
+    public function docFreq(string $tag): int
+    {
+        return $this->df[Unicode::lower($tag)] ?? 0;
+    }
 
     /** @param string[] $tags */
     public function index(int $productId, array $tags): void
     {
-        $lower = array_map('strtolower', $tags);
+        if (isset($this->dl[$productId])) {
+            throw new \LogicException("BM25: produit {$productId} déjà indexé — appeler remove() d'abord.");
+        }
+        $lower = array_map([Unicode::class, 'lower'], $tags);
         $this->dl[$productId] = count($lower);
+        $this->dlSum += count($lower);
         $this->N++;
-        $this->avgdl = array_sum($this->dl) / $this->N;
+        $this->avgdl = $this->dlSum / $this->N;
 
         foreach ($lower as $tag) {
-            $this->tf[$tag][$productId] = ($this->tf[$tag][$productId] ?? 0) + 1;
-            if ($this->tf[$tag][$productId] === 1) {
+            $prev = $this->tf[$tag][$productId] ?? 0;
+            $this->tf[$tag][$productId] = $prev + 1;
+            if ($prev === 0) {
                 $this->df[$tag] = ($this->df[$tag] ?? 0) + 1;
+            }
+        }
+    }
+
+    /**
+     * Désindexe un produit.
+     * @param string[] $tags les tags passés à index()
+     */
+    public function remove(int $productId, array $tags): void
+    {
+        if (!isset($this->dl[$productId])) {
+            return;
+        }
+        $this->dlSum -= $this->dl[$productId];
+        unset($this->dl[$productId]);
+        $this->N--;
+        $this->avgdl = $this->N > 0 ? $this->dlSum / $this->N : 0.0;
+
+        foreach (array_unique(array_map([Unicode::class, 'lower'], $tags)) as $tag) {
+            if (isset($this->tf[$tag][$productId])) {
+                unset($this->tf[$tag][$productId]);
+                $this->df[$tag]--;
+                if ($this->tf[$tag] === []) {
+                    unset($this->tf[$tag], $this->df[$tag]);
+                }
             }
         }
     }
@@ -42,7 +83,7 @@ final class BM25Index
         $dlD   = $this->dl[$productId] ?? 0;
 
         foreach ($queryTags as $raw) {
-            $tag   = strtolower($raw);
+            $tag   = Unicode::lower((string) $raw);
             $tfVal = $this->tf[$tag][$productId] ?? 0;
             if ($tfVal === 0) continue;
             $dfVal = $this->df[$tag] ?? 0;

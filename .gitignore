@@ -1,0 +1,29 @@
+# Dépendances installées (reproductibles via les fichiers de verrouillage)
+node_modules/
+vendor/
+
+# Artefacts de build (reconstruits par la CI / avant publication)
+dist/
+build/
+*.egg-info/
+*.whl
+
+# Caches et résultats de tests
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.phpunit.result.cache
+.phpunit.cache/
+.vite/
+coverage/
+.coverage
+htmlcov/
+
+# Environnements, éditeurs, OS
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

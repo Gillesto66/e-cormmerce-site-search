@@ -28,8 +28,12 @@ tagsearch/
 
 **`structures.py`** — Phase 1 (mémoire)
 - `TrieNode` avec `__slots__` + tableau fixe de 38 slots : 83% moins de RAM qu'un objet standard
-- `DAWG` via algorithme de Daciuk : partage des suffixes, 30-50% moins de nœuds vs Trie
-- `CompressedPostingsList` : delta-encoding + VarInt, 98% moins de RAM vs `set` Python
+- `DAWG` via algorithme de Daciuk : partage réel des suffixes (le mot est reconstruit par le chemin, jamais stocké dans le nœud). Gain mesuré sur le nombre de nœuds : 85 % sur un vocabulaire synthétique à suffixes répétés, 50 % en pire cas ; non mesuré sur un vrai catalogue (`benchmarks/dawg_vs_trie.py`)
+- `CompressedPostingsList` : delta-encoding + VarInt, −97,5 % de RAM vs `set` Python sur 500 identifiants (mesuré)
+
+**Indexation paresseuse** : `add_product()` / `add_products()` / `load_catalog()` n'enregistrent que les données ; le DAWG est reconstruit une seule fois, au premier `search()` suivant ou via `commit()`. Charger N produits coûte O(N). `load_catalog()` est atomique (un produit invalide n'ajoute rien).
+
+**Erreurs** : seules les `ValueError` de validation d'entrée (requête vide, `max_dist < 0`, `top_k < 1`) sont levées volontairement ; toute autre exception est un vrai bug et remonte telle quelle (elle n'est plus convertie en « aucun résultat »).
 
 **`scoring.py`** — Phase 2 (intelligence)
 - `BM25Index` : Okapi BM25 in-memory, paramètres `k1=1.5`, `b=0.75`

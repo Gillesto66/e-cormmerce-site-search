@@ -22,7 +22,7 @@ Exposer le même moteur de recherche TagSearch dans l'écosystème JavaScript/Ty
 ```
 src/
 ├── models.ts       ProductMeta, ProductType, SearchPreferences
-├── structures.ts   DAWG, LRUCache
+├── structures.ts   DAWG, VarInt, CompressedPostingsList, LRUCache
 ├── scoring.ts      BM25Index, calculateFinalScore + constantes
 ├── engine.ts       SearchEngine — point d'entrée public
 └── index.ts        Exports publics du package
@@ -31,7 +31,8 @@ src/
 **Différences vs Python :**
 - Pas de `__slots__` (inutile en JS — les objets V8 sont déjà optimisés)
 - `Map` au lieu de `dict` pour les structures internes (meilleure performance sur les clés string)
-- `DAWG.structuralKey()` utilise une string sérialisée au lieu d'un tuple Python
+- Le DAWG identifie ses nœuds par un `id` entier (clé structurelle en O(degré), et non une chaîne récursive en O(sous-arbre))
+- Les mots sont découpés en points de code (`Array.from`) : même distance de Levenshtein que Python, y compris pour les emoji et le CJK
 
 ---
 
@@ -141,10 +142,12 @@ npm test
 
 ## Précision flottante cross-langage
 
-`Math.log()` en V8 et `math.log()` en Python utilisent tous deux IEEE 754 double précision mais peuvent diverger au 15e chiffre significatif. Les scores sont arrondis à 4 décimales (`Math.round(x * 10000) / 10000`). Tolérance des tests : `1e-9` sur les composants isolés, `1e-3` sur les ratios post-arrondi.
+`Math.log()` en V8 et `math.log()` en Python utilisent tous deux IEEE 754 double précision mais peuvent diverger au 15e chiffre significatif. Les scores sont arrondis à 4 décimales par `round4()`, qui reproduit exactement `round(x, 4)` de Python (`Math.round(x * 10000) / 10000` diverge quand `x * 10000` tombe sur `.5` par erreur d'arrondi, et `toFixed` diverge sur les égalités exactes `k/32`). Vérifié sur 7 063 valeurs. Tolérance des tests de scores : `1e-9`.
 
 ---
 
 ## Benchmark
 
-Identique au moteur Python. Le DAWG est reconstruit à chaque `addProduct()`. En production avec des insertions fréquentes, utiliser un buffer Trie et reconstruire en batch.
+Indexation linéaire (le DAWG est reconstruit une seule fois, au premier `search()` suivant un ajout, ou via `commit()` ; `addProducts()` fait un lot). Mesures, méthode et limites : [docs/benchmarks.md](../docs/benchmarks.md) ; script : `node --expose-gc benchmarks/run.mjs`.
+
+Gain mémoire des postings (delta + VarInt, 500 identifiants) : ≈ 806 octets contre ≈ 20,5 ko pour un `Set` (−96 %).

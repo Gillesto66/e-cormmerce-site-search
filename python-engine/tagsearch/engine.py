@@ -9,7 +9,7 @@ Orchestre DAWG, BM25Index, CompressedPostingsList, LRUCache et calculate_final_s
 from __future__ import annotations
 import json
 import logging
-import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from .models import ProductMeta, ProductType, SearchPreferences
@@ -30,6 +30,10 @@ class SearchEngine:
         calculate_final_score → re-ranking 5 dimensions
         LRUCache              → cache des résultats de recherche
 
+    Indexation paresseuse : add_product()/add_products() n'enregistrent que les
+    données ; le DAWG est reconstruit UNE fois, au premier search() suivant ou
+    via commit(). Charger N produits coûte donc O(N), pas O(N²).
+
     Example:
         >>> engine = SearchEngine()
         >>> engine.load_catalog("shared-assets/catalog.json")
@@ -40,12 +44,13 @@ class SearchEngine:
     """
 
     def __init__(self, cache_size: int = 200) -> None:
-        self._all_tags: list[str] = []
         self.dawg: DAWG = DAWG()
         self.inverted_index: dict[str, CompressedPostingsList] = {}
         self.catalog: dict[int, ProductMeta] = {}
         self.bm25: BM25Index = BM25Index()
         self.cache: LRUCache = LRUCache(capacity=cache_size)
+        self._dirty_tags: set[str] = set()     # postings à compresser au prochain commit
+        self._vocab_changed: bool = False       # DAWG à reconstruire au prochain commit
         logger.info("SearchEngine initialisé (cache_size=%d)", cache_size)
 
     # ── Chargement ──────────────────────────────────────────────────────────
@@ -53,6 +58,7 @@ class SearchEngine:
     def load_catalog(self, path: str | Path) -> None:
         """
         Charge un catalogue depuis un fichier JSON (format shared-assets/catalog.json).
+        Atomique : si un produit est invalide, rien n'est ajouté.
 
         Args:
             path: Chemin vers le fichier JSON.
@@ -69,12 +75,13 @@ class SearchEngine:
         except json.JSONDecodeError as exc:
             raise ValueError(f"JSON malformé dans {path} : {exc}") from exc
 
-        products = data.get("products", [])
-        if not products:
+        raw_products = data.get("products", [])
+        if not raw_products:
             logger.warning("Catalogue vide : aucun produit chargé depuis %s", path)
             return
 
-        for raw in products:
+        parsed: list[tuple[int, ProductMeta]] = []
+        for raw in raw_products:
             try:
                 meta = ProductMeta(
                     name         = raw["name"],
@@ -86,44 +93,100 @@ class SearchEngine:
                     review_count = int(raw["review_count"]),
                     tags         = [str(t) for t in raw["tags"]],
                 )
-                self.add_product(int(raw["id"]), meta)
+                parsed.append((int(raw["id"]), meta))
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"Produit invalide (id={raw.get('id', '?')}) : {exc}") from exc
 
-        logger.info("Catalogue chargé : %d produits depuis %s", len(products), path)
+        self.add_products(parsed)
+        logger.info("Catalogue chargé : %d produits depuis %s", len(parsed), path)
 
     def add_product(self, product_id: int, meta: ProductMeta) -> None:
         """
-        Indexe un produit.
-
-        Args:
-            product_id: Identifiant unique (entier positif).
-            meta:       Métadonnées complètes du produit.
+        Enregistre un produit. L'index de recherche est mis à jour au prochain
+        search() ou commit() (reconstruction unique, pas une par produit).
+        Un identifiant déjà présent est REMPLACÉ proprement (postings et BM25 mis à jour).
 
         Raises:
-            ValueError: Si product_id est négatif ou déjà présent.
+            ValueError: Si product_id est négatif.
         """
+        self._add(product_id, meta)
+        self.cache.invalidate()
+
+    def add_products(self, items: Iterable[tuple[int, ProductMeta]]) -> int:
+        """
+        Ajoute un lot de produits puis reconstruit l'index une seule fois.
+
+        Args:
+            items: itérable de (product_id, meta).
+
+        Returns:
+            Nombre de produits traités.
+        """
+        count = 0
+        for product_id, meta in items:
+            self._add(product_id, meta)
+            count += 1
+        self.cache.invalidate()
+        self.commit()
+        return count
+
+    def remove_product(self, product_id: int) -> bool:
+        """Retire un produit de l'index. Retourne False s'il n'existait pas."""
+        if product_id not in self.catalog:
+            return False
+        self._remove(product_id)
+        self.cache.invalidate()
+        return True
+
+    def commit(self) -> None:
+        """
+        Finalise l'index : compresse uniquement les postings modifiés et
+        reconstruit le DAWG si le vocabulaire a changé. Idempotent.
+        """
+        for tag in self._dirty_tags:
+            postings = self.inverted_index.get(tag)
+            if postings is not None:
+                postings.flush()
+        self._dirty_tags.clear()
+        if self._vocab_changed:
+            self.dawg = DAWG.build(self.inverted_index.keys())
+            self._vocab_changed = False
+            logger.debug("DAWG reconstruit : %d nœuds", self.dawg.node_count())
+
+    @property
+    def dirty(self) -> bool:
+        """True si des produits ont été ajoutés/retirés depuis le dernier commit()."""
+        return bool(self._dirty_tags) or self._vocab_changed
+
+    def _add(self, product_id: int, meta: ProductMeta) -> None:
         if product_id < 0:
             raise ValueError(f"product_id doit être >= 0, reçu : {product_id}")
         if product_id in self.catalog:
-            logger.warning("Produit %d déjà indexé — écrasement.", product_id)
+            logger.warning("Produit %d déjà indexé — remplacement.", product_id)
+            self._remove(product_id)
 
         self.catalog[product_id] = meta
-
-        for tag in meta.tags:
-            tag_lower = tag.lower()
-            if tag_lower not in self.inverted_index:
-                self.inverted_index[tag_lower] = CompressedPostingsList()
-                self._all_tags.append(tag_lower)
-            self.inverted_index[tag_lower].add(product_id)
-
+        for tag in {t.lower() for t in meta.tags}:
+            postings = self.inverted_index.get(tag)
+            if postings is None:
+                postings = self.inverted_index[tag] = CompressedPostingsList()
+                self._vocab_changed = True
+            postings.add(product_id)
+            self._dirty_tags.add(tag)
         self.bm25.index(product_id, meta.tags)
 
-        for pl in self.inverted_index.values():
-            pl.flush()
-        self.dawg = DAWG.build(self._all_tags)
-        self.cache.invalidate()
-        logger.debug("Produit %d indexé : '%s'", product_id, meta.name)
+    def _remove(self, product_id: int) -> None:
+        meta = self.catalog.pop(product_id)
+        for tag in {t.lower() for t in meta.tags}:
+            postings = self.inverted_index[tag]
+            postings.remove(product_id)
+            if len(postings) == 0:
+                del self.inverted_index[tag]
+                self._dirty_tags.discard(tag)
+                self._vocab_changed = True
+            else:
+                self._dirty_tags.add(tag)
+        self.bm25.remove(product_id, meta.tags)
 
     # ── Recherche ────────────────────────────────────────────────────────────
 
@@ -143,14 +206,18 @@ class SearchEngine:
             2. CompressedPostingsList  → candidate_ids
             3. BM25Index.score()       → bm25_raw par produit
             4. calculate_final_score() → score final (5 dimensions)
-            5. Tri décroissant + top_k + cache LRU
+            5. Tri (score décroissant, puis id croissant) + top_k + cache LRU
+
+        Ordre déterministe : les ex æquo de score sont départagés par `id` croissant,
+        et les tags appariés sont ordonnés (distance, tag) — règle identique en
+        Python, JS et PHP.
 
         Args:
             query:    Requête utilisateur (chaîne brute, normalisée en interne).
             prefs:    Préférences de re-ranking. None = comportement neutre.
             fuzzy:    Si True, utilise la recherche floue (Levenshtein + pruning).
             max_dist: Distance de Levenshtein maximale (1 = 1 faute de frappe).
-            top_k:    Nombre maximum de résultats retournés.
+            top_k:    Nombre maximum de résultats retournés (>= 1).
 
         Returns:
             Tuple (results, status) où :
@@ -159,38 +226,37 @@ class SearchEngine:
                 status  : "CACHÉ" | "CALCULÉ" | "MISS".
 
         Raises:
-            ValueError: Si query est vide ou max_dist < 0.
+            ValueError: Si query est vide, max_dist < 0 ou top_k < 1.
+                Toute autre exception est une vraie erreur et remonte telle quelle.
         """
         if not query or not query.strip():
             raise ValueError("La requête ne peut pas être vide.")
         if max_dist < 0:
             raise ValueError(f"max_dist doit être >= 0, reçu : {max_dist}")
+        if top_k < 1:
+            raise ValueError(f"top_k doit être >= 1, reçu : {top_k}")
         if not self.catalog:
             logger.warning("search() appelé sur un index vide.")
             return [], "MISS"
 
         if prefs is None:
             prefs = SearchPreferences()
+        if self.dirty:
+            self.commit()
 
-        cache_key = f"{query.strip().lower()}|{prefs}"
+        query_lower = query.strip().lower()
+        cache_key = f"{query_lower}|{prefs}|{fuzzy}|{max_dist}|{top_k}"
         cached = self.cache.get(cache_key)
         if cached is not None:
             logger.debug("Cache HIT pour '%s'", query)
-            return cached, "CACHÉ"
-
-        query_lower = query.strip().lower()
+            return [dict(r) for r in cached], "CACHÉ"
 
         # 1. Tags via DAWG
-        try:
-            matched_tags = (
-                self.dawg.fuzzy_search(query_lower, max_dist)
-                if fuzzy else
-                self.dawg.autocomplete(query_lower)
-            )
-        except Exception as exc:
-            logger.error("Erreur DAWG pour '%s' : %s", query, exc)
-            return [], "MISS"
-
+        matched_tags = (
+            self.dawg.fuzzy_search(query_lower, max_dist)
+            if fuzzy else
+            self.dawg.autocomplete(query_lower)
+        )
         if not matched_tags:
             logger.debug("Aucun tag trouvé pour '%s'", query)
             return [], "MISS"
@@ -198,32 +264,18 @@ class SearchEngine:
         # 2. Candidats via inverted index
         candidate_ids: set[int] = set()
         for tag in matched_tags:
-            if tag in self.inverted_index:
-                try:
-                    candidate_ids.update(self.inverted_index[tag].decompress())
-                except Exception as exc:
-                    logger.error("Erreur décompression postings '%s' : %s", tag, exc)
-
+            candidate_ids.update(self.inverted_index[tag].decompress())
         if not candidate_ids:
             return [], "MISS"
 
         # 3. BM25 + re-ranking
         results: list[dict] = []
         for pid in candidate_ids:
-            meta = self.catalog.get(pid)
-            if meta is None:
-                logger.warning("product_id %d dans l'index mais absent du catalogue.", pid)
-                continue
-            try:
-                bm25_raw    = self.bm25.score(pid, matched_tags)
-                final_score = calculate_final_score(pid, meta, bm25_raw, prefs)
-            except Exception as exc:
-                logger.error("Erreur scoring produit %d : %s", pid, exc)
-                continue
-
+            meta = self.catalog[pid]
+            bm25_raw    = self.bm25.score(pid, matched_tags)
+            final_score = calculate_final_score(pid, meta, bm25_raw, prefs)
             if final_score is None:
                 continue
-
             results.append({
                 "id"     : pid,
                 "name"   : meta.name,
@@ -235,9 +287,9 @@ class SearchEngine:
                 "score"  : final_score,
             })
 
-        results.sort(key=lambda x: x["score"], reverse=True)
+        results.sort(key=lambda r: (-r["score"], r["id"]))
         final_list = results[:top_k]
 
         self.cache.put(cache_key, final_list)
         logger.info("Recherche '%s' : %d résultats (%d candidats)", query, len(final_list), len(candidate_ids))
-        return final_list, "CALCULÉ"
+        return [dict(r) for r in final_list], "CALCULÉ"

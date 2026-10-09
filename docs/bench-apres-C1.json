@@ -1,0 +1,62 @@
+[
+  {
+    "produits": 100,
+    "index_s": 0.162,
+    "ratio": null,
+    "search_p50_ms": 0.054,
+    "search_p99_ms": 0.424,
+    "fuzzy_p50_ms": 0.772,
+    "fuzzy_p99_ms": 2.924,
+    "memoire_mo": 0.65
+  },
+  {
+    "produits": 200,
+    "index_s": 0.299,
+    "ratio": 1.85,
+    "search_p50_ms": 0.084,
+    "search_p99_ms": 1.773,
+    "fuzzy_p50_ms": 1.016,
+    "fuzzy_p99_ms": 2.381,
+    "memoire_mo": 0.99
+  },
+  {
+    "produits": 400,
+    "index_s": 0.407,
+    "ratio": 1.36,
+    "search_p50_ms": 0.142,
+    "search_p99_ms": 2.809,
+    "fuzzy_p50_ms": 1.34,
+    "fuzzy_p99_ms": 5.145,
+    "memoire_mo": 1.34
+  },
+  {
+    "produits": 800,
+    "index_s": 0.781,
+    "ratio": 1.92,
+    "search_p50_ms": 0.24,
+    "search_p99_ms": 12.477,
+    "fuzzy_p50_ms": 1.562,
+    "fuzzy_p99_ms": 3.556,
+    "memoire_mo": 1.95
+  },
+  {
+    "produits": 1600,
+    "index_s": 0.988,
+    "ratio": 1.26,
+    "search_p50_ms": 0.452,
+    "search_p99_ms": 17.921,
+    "fuzzy_p50_ms": 2.072,
+    "fuzzy_p99_ms": 8.255,
+    "memoire_mo": 2.74
+  },
+  {
+    "produits": 3200,
+    "index_s": 1.601,
+    "ratio": 1.62,
+    "search_p50_ms": 0.66,
+    "search_p99_ms": 26.226,
+    "fuzzy_p50_ms": 2.099,
+    "fuzzy_p99_ms": 9.242,
+    "memoire_mo": 4.32
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "produits": 100,
+    "index_s": 3.403,
+    "ratio": null,
+    "search_p50_ms": 0.014,
+    "search_p99_ms": 0.123,
+    "fuzzy_p50_ms": 0.225,
+    "fuzzy_p99_ms": 0.377,
+    "memoire_mo": 1.68
+  },
+  {
+    "produits": 200,
+    "index_s": 11.045,
+    "ratio": 3.25,
+    "search_p50_ms": 0.027,
+    "search_p99_ms": 0.413,
+    "fuzzy_p50_ms": 0.324,
+    "fuzzy_p99_ms": 0.571,
+    "memoire_mo": 2.37
+  },
+  {
+    "produits": 400,
+    "index_s": 42.049,
+    "ratio": 3.81,
+    "search_p50_ms": 0.057,
+    "search_p99_ms": 1.551,
+    "fuzzy_p50_ms": 0.795,
+    "fuzzy_p99_ms": 1.353,
+    "memoire_mo": 3.63
+  }
+]

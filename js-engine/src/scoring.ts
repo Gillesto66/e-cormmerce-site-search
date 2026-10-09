@@ -6,9 +6,11 @@
  * Précision flottante :
  *   Constantes identiques à scoring.py. Math.log() en V8 peut diverger
  *   au 15e chiffre vs Python. Tolérance cross-langage : 1e-9.
+ *   L'arrondi à 4 décimales est EXACT (round4) : `Math.round(x * 1e4) / 1e4` donne un
+ *   résultat différent de Python quand x * 1e4 tombe sur .5 par erreur d'arrondi.
  */
 
-import { ProductMeta, ProductType, SearchPreferences } from "./models.js";
+import { ProductMeta, SearchPreferences } from "./models.js";
 
 export const BM25_K1            = 1.5;
 export const BM25_B             = 0.75;
@@ -22,6 +24,20 @@ export const NICHE_BOOST        = 1.2;
 export const PROXIMITY_BONUS    = 1.15;
 export const PRICE_BUDGET_BOOST = 1.1;
 
+/**
+ * Arrondi à 4 décimales identique à `round(x, 4)` de Python (valeur exacte du double,
+ * égalité parfaite arrondie au pair). `toFixed` travaille sur la valeur exacte ; seuls
+ * les x = m/32 (m impair) sont des égalités exactes, traitées explicitement.
+ */
+export function round4(x: number): number {
+  const m = x * 32;                       // exact : multiplication par une puissance de 2
+  if (Number.isInteger(m) && Math.abs(m) % 2 === 1) {
+    const t = (m * 625) / 2;              // x * 1e4, exact ici
+    const lo = Math.floor(t);
+    return (lo % 2 === 0 ? lo : lo + 1) / 1e4;
+  }
+  return Number(x.toFixed(4));
+}
 
 export class BM25Index {
   private tf:    Map<string, Map<number, number>> = new Map();
@@ -29,23 +45,47 @@ export class BM25Index {
   private dl:    Map<number, number>              = new Map();
   private N      = 0;
   private avgdl  = 0;
+  private dlSum  = 0;      // somme courante : avgdl en O(1) (et non O(N) par ajout)
+
+  get docCount(): number { return this.N; }
+  docFreq(tag: string): number { return this.df.get(tag.toLowerCase()) ?? 0; }
 
   index(productId: number, tags: readonly string[]): void {
+    if (this.dl.has(productId)) {
+      throw new Error(`BM25: produit ${productId} déjà indexé — appeler remove() d'abord.`);
+    }
     const lower = tags.map(t => t.toLowerCase());
     this.dl.set(productId, lower.length);
+    this.dlSum += lower.length;
     this.N++;
-    let sum = 0; this.dl.forEach(v => (sum += v));
-    this.avgdl = sum / this.N;
+    this.avgdl = this.dlSum / this.N;
     for (const tag of lower) {
-      if (!this.tf.has(tag)) this.tf.set(tag, new Map());
-      const m    = this.tf.get(tag)!;
-      const prev = m.get(productId) ?? 0;
-      m.set(productId, prev + 1);
+      let postings = this.tf.get(tag);
+      if (!postings) { postings = new Map(); this.tf.set(tag, postings); }
+      const prev = postings.get(productId) ?? 0;
+      postings.set(productId, prev + 1);
       if (prev === 0) this.df.set(tag, (this.df.get(tag) ?? 0) + 1);
     }
   }
 
-  score(productId: number, queryTags: string[]): number {
+  /** Désindexe un produit. `tags` : les tags passés à index(). */
+  remove(productId: number, tags: readonly string[]): void {
+    const len = this.dl.get(productId);
+    if (len === undefined) return;
+    this.dl.delete(productId);
+    this.dlSum -= len;
+    this.N--;
+    this.avgdl = this.N > 0 ? this.dlSum / this.N : 0;
+    for (const tag of new Set(tags.map(t => t.toLowerCase()))) {
+      const postings = this.tf.get(tag);
+      if (postings && postings.delete(productId)) {
+        this.df.set(tag, (this.df.get(tag) ?? 1) - 1);
+        if (postings.size === 0) { this.tf.delete(tag); this.df.delete(tag); }
+      }
+    }
+  }
+
+  score(productId: number, queryTags: readonly string[]): number {
     if (this.N === 0 || this.avgdl === 0) return 0;
     let total = 0;
     const dlD = this.dl.get(productId) ?? 0;
@@ -90,5 +130,5 @@ export function calculateFinalScore(
                     ? PRICE_BUDGET_BOOST : 1.0;
 
   const final = bm25Norm * qualityMult * typeFactor * nicheFactor * proximity * priceFactor;
-  return Math.round(final * 10000) / 10000;
+  return round4(final);
 }

@@ -1,8 +1,18 @@
 {
   "name": "tagsearch/php-engine",
-  "description": "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking)",
+  "description": "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking), zero runtime dependencies",
   "type": "library",
-  "require": { "php": ">=8.2" },
+  "license": "MIT",
+  "keywords": ["search", "e-commerce", "tags", "bm25", "dawg", "fuzzy", "autocomplete", "in-memory", "laravel"],
+  "homepage": "https://github.com/Gillesto66/php-e-cormmerce-search",
+  "authors": [
+    { "name": "Gillesto66", "email": "gillesto66@users.noreply.github.com", "homepage": "https://github.com/Gillesto66" }
+  ],
+  "support": {
+    "issues": "https://github.com/Gillesto66/php-e-cormmerce-search/issues",
+    "source": "https://github.com/Gillesto66/php-e-cormmerce-search"
+  },
+  "require": { "php": ">=8.2", "ext-mbstring": "*" },
   "require-dev": { "phpunit/phpunit": "^11.0" },
   "autoload": {
     "psr-4": { "TagSearch\\": "src/" },
@@ -10,5 +20,9 @@
   },
   "autoload-dev": {
     "psr-4": { "TagSearch\\Tests\\": "tests/" }
-  }
+  },
+  "scripts": {
+    "test": "phpunit"
+  },
+  "config": { "sort-packages": true }
 }

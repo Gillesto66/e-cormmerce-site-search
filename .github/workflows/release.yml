@@ -1,0 +1,72 @@
+# Publication déclenchée par un tag vX.Y.Z — PyPI et npm en « trusted publishing » (sans jeton stocké pour PyPI).
+# Packagist se met à jour tout seul par webhook GitHub sur le dépôt php-e-cormmerce-search (voir docs/RELEASE.md).
+#
+# Garde-fous : les jobs de publication exigent l'environnement « release » (approbation manuelle réglable
+# dans Settings > Environments) et ne partent que si le tag égale la version déclarée dans les manifestes.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Vérifier tag = versions des manifestes, puis tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Le tag doit égaler les trois versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          py=$(python -c "import tomllib;print(tomllib.load(open('python-engine/pyproject.toml','rb'))['project']['version'])")
+          js=$(node -p "require('./js-engine/package.json').version")
+          echo "tag=$tag python=$py js=$js"
+          [ "$tag" = "$py" ] && [ "$tag" = "$js" ]
+      - run: python -m pip install pytest build && python -m pytest -q
+        working-directory: python-engine
+      - run: npm ci && npm run typecheck && npm test
+        working-directory: js-engine
+
+  pypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install build && python -m build
+        working-directory: python-engine
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python-engine/dist/
+
+  npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - run: npm ci && npm publish --provenance --access public
+        working-directory: js-engine
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

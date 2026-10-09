@@ -4,10 +4,35 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tagsearch"
-version = "1.0.0"
-description = "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking)"
+version = "1.0.1"
+description = "In-memory tag search engine for e-commerce (DAWG + BM25 + hybrid ranking), zero dependencies"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Gillesto66", email = "gillesto66@users.noreply.github.com" }]
+keywords = ["search", "e-commerce", "tags", "bm25", "dawg", "fuzzy", "autocomplete", "in-memory"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Indexing",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Gillesto66/e-cormmerce-site-search"
+Repository = "https://github.com/Gillesto66/e-cormmerce-site-search"
+Documentation = "https://github.com/Gillesto66/e-cormmerce-site-search#readme"
+"Bug Tracker" = "https://github.com/Gillesto66/e-cormmerce-site-search/issues"
+Changelog = "https://github.com/Gillesto66/e-cormmerce-site-search/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov"]
@@ -19,3 +44,6 @@ pythonpath = ["."]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tagsearch*"]
+
+[tool.setuptools.package-data]
+tagsearch = ["py.typed"]

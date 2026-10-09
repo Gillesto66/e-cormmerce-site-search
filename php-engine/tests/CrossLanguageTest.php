@@ -17,7 +17,7 @@ use TagSearch\{BM25Index, ProductMeta, ProductType, Scorer, SearchEngine, Search
 final class CrossLanguageTest extends TestCase
 {
     private static SearchEngine $engine;
-    private const CATALOG   = __DIR__ . '/../../shared-assets/catalog.json';
+    private const CATALOG   = __DIR__ . '/fixtures/catalog.json';
     private const TOLERANCE = 1e-9;
 
     public static function setUpBeforeClass(): void
