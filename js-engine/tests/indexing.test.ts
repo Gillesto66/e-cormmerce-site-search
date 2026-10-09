@@ -60,18 +60,19 @@ describe("C1 — indexation en lot", () => {
   });
 
   it("l'indexation n'est pas quadratique (2N produits < 3x le temps de N)", () => {
-    const best = (n: number) => {
-      let b = Infinity;
-      for (let k = 0; k < 3; k++) {
-        const r = rng(9);
-        const it = items(n, r, vocab(400, r));
-        const t0 = performance.now();
-        new SearchEngine().addProducts(it);
-        b = Math.min(b, performance.now() - t0);
-      }
-      return b;
+    // Le garde-fou DÉTERMINISTE est le test précédent (une seule reconstruction du DAWG). Ce test
+    // chronométré est un filet : échauffement du JIT, tailles assez grandes pour que le bruit d'un
+    // runner partagé soit négligeable, meilleur de 5 essais.
+    const run = (n: number) => {
+      const r = rng(9);
+      const it = items(n, r, vocab(400, r));
+      const t0 = performance.now();
+      new SearchEngine().addProducts(it);
+      return performance.now() - t0;
     };
-    expect(best(2000) / best(1000)).toBeLessThan(3);
+    run(2000); run(2000);                       // échauffement
+    const best = (n: number) => Math.min(...Array.from({ length: 5 }, () => run(n)));
+    expect(best(8000) / best(4000)).toBeLessThan(3);
   });
 
   it("loadCatalog est atomique", () => {
