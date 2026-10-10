@@ -1,4 +1,4 @@
-# Publication déclenchée par un tag vX.Y.Z — PyPI et npm en « trusted publishing » (sans jeton stocké pour PyPI).
+# Publication déclenchée par un tag vX.Y.Z — PyPI et npm en « trusted publishing » (OIDC, aucun jeton stocké).
 # Packagist se met à jour tout seul par webhook GitHub sur le dépôt php-e-cormmerce-search (voir docs/RELEASE.md).
 #
 # Garde-fous : les jobs de publication exigent l'environnement « release » (approbation manuelle réglable
@@ -8,6 +8,19 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
+  # Republier un tag EXISTANT sans le déplacer (ex. rejouer npm après avoir configuré le publisher).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag à publier (ex. v1.0.1)"
+        required: true
+        type: string
+      target:
+        description: "Quoi publier"
+        required: true
+        default: npm
+        type: choice
+        options: [npm, pypi, both]
 
 permissions:
   contents: read
@@ -18,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -25,8 +40,10 @@ jobs:
         with:
           node-version: "22"
       - name: Le tag doit égaler les trois versions
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${RELEASE_TAG#v}"
           py=$(python -c "import tomllib;print(tomllib.load(open('python-engine/pyproject.toml','rb'))['project']['version'])")
           js=$(node -p "require('./js-engine/package.json').version")
           echo "tag=$tag python=$py js=$js"
@@ -38,12 +55,15 @@ jobs:
 
   pypi:
     needs: verify
+    if: github.event_name == 'push' || github.event.inputs.target != 'npm'
     runs-on: ubuntu-latest
     environment: release
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -55,18 +75,21 @@ jobs:
 
   npm:
     needs: verify
+    if: github.event_name == 'push' || github.event.inputs.target != 'pypi'
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: read
-      id-token: write
+      id-token: write   # OIDC : npm « trusted publishing », aucun jeton stocké
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: https://registry.npmjs.org
-      - run: npm ci && npm publish --provenance --access public
+      # Le trusted publishing exige npm >= 11.5.1.
+      - run: npm install -g npm@latest && npm --version
+      - run: npm ci && npm publish --access public
         working-directory: js-engine
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
